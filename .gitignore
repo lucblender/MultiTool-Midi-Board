@@ -215,3 +215,5 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/kicad,python
 Hardware/multi-tool-midi-board/librarires/*
+
+*.zip
