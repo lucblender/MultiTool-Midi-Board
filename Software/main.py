@@ -1,5 +1,6 @@
 import machine
 from machine import Pin
+from multiToolMidiConfig import *
 
 import SimpleMIDIDecoder
 import time
@@ -12,19 +13,30 @@ btn1=Pin(6, mode=Pin.IN, pull = Pin.PULL_UP)
 btn2=Pin(7, mode=Pin.IN, pull = Pin.PULL_UP)
 btn3=Pin(16, mode=Pin.IN, pull = Pin.PULL_UP)
 
-OLED = OLED_2inch23()
+# Initialise the serial MIDI handling
+uart = machine.UART(0,31250)
+
+multiToolMidiConfig = MultiToolMidiConfig()
+
+OLED = OLED_2inch23(multiToolMidiConfig)
+
+multiToolMidiConfig.setDisplay(OLED)
+
+
 
 def doMidiNoteOn(ch, cmd, note, vel):
     print(ch, cmd, note, vel)
+    multiToolMidiConfig.note_on(note, ch)
     
 def doMidiNoteOff(ch, cmd, note, vel):
     print(ch, cmd, note, vel)
+    multiToolMidiConfig.note_off(note, ch)
     
 def doMidiThru(ch,cmd,data1,data2,idx = -1):
     print(ch,cmd,data1,data2,idx)
+    if cmd == 176:        
+        multiToolMidiConfig.mode_update(data2, ch)
     
-# Initialise the serial MIDI handling
-uart = machine.UART(0,31250)
 # initialise MIDI decoder and set up callbacks
 md = SimpleMIDIDecoder.SimpleMIDIDecoder()
 md.cbNoteOn (doMidiNoteOn)
@@ -44,6 +56,7 @@ time.sleep(1)
 if (btn0.value() and  btn1.value() and  btn2.value() and  btn3.value()) == 0:
     print("launch main")
     led.value(1)
+    OLED.display()
     while True:
         # Check for MIDI messages
         if (uart.any()):

@@ -7,6 +7,7 @@ import font.arial10 as arial10
 import font.font10 as font10
 import font.font6 as font6
 import writer
+from multiToolMidiConfig import *
 
 DC = 8
 RST = 12
@@ -24,7 +25,9 @@ def pict_to_fbuff(path,x,y):
 
 
 class OLED_2inch23(framebuf.FrameBuffer):
-    def __init__(self):
+    def __init__(self, multiToolMidiConfig):        
+        self.multiToolMidiConfig = multiToolMidiConfig
+        
         self.width = 128
         self.height = 32
         
@@ -116,6 +119,21 @@ class OLED_2inch23(framebuf.FrameBuffer):
         self.write_cmd(0xDB) #set vcomh
         self.write_cmd(0x08)#Set VCOM Deselect Level
         self.write_cmd(0xAF); #-Set Page Addressing Mode (0x00/0x01/0x02)
+        
+    def display(self):        
+        self.fill(0x0000)
+        if  self.multiToolMidiConfig.display_menu == False:
+            channel_letters = ["A", "B", "C", "D"]
+            for i in range(0,4):
+                if i%2==0:
+                    self.rect(0+i*32,0,32,16,self.white)
+                    self.font_writer_arial8.text(str(channel_letters[i]),2+i*32,2)
+                    self.font_writer_arial10.text("Ch:"+str(self.multiToolMidiConfig.midi_channels_for_modules[i]),8+i*32,5)
+                else:
+                    self.fill_rect(0+i*32,0,32,16,self.white)
+                    self.font_writer_arial8.text(str(channel_letters[i]),2+i*32,2,True)
+                    self.font_writer_arial10.text("Ch:"+str(self.multiToolMidiConfig.midi_channels_for_modules[i]),8+i*32,5,True)
+        self.show()
 
     def show(self):
         for page in range(0,4):
