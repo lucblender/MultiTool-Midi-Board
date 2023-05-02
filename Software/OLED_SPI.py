@@ -8,6 +8,9 @@ import font.font10 as font10
 import font.font6 as font6
 import writer
 from multiToolMidiConfig import *
+from random import randrange
+
+import _thread
 
 DC = 8
 RST = 12
@@ -28,16 +31,21 @@ class OLED_2inch23(framebuf.FrameBuffer):
     def __init__(self, multiToolMidiConfig):        
         self.multiToolMidiConfig = multiToolMidiConfig
         
+        self.show_lock = _thread.allocate_lock()
+        
         self.width = 128
         self.height = 32
+        
+        self.screensaver_active = False
+        self.screesaver_pixels = [[0]*2]*20
         
         self.cs = Pin(CS,Pin.OUT)
         self.rst = Pin(RST,Pin.OUT)
         
         self.cs(1)
         self.spi = SPI(1)
-        self.spi = SPI(1,1000_000)
-        self.spi = SPI(1,10000_000,polarity=0, phase=0,sck=Pin(SCK),mosi=Pin(MOSI),miso=None)
+        self.spi = SPI(1,4000_000)
+        self.spi = SPI(1,4000_000,polarity=0, phase=0,sck=Pin(SCK),mosi=Pin(MOSI),miso=None)
         self.dc = Pin(DC,Pin.OUT)
         self.dc(1)
         self.buffer = bytearray(self.height * self.width // 8)
@@ -136,6 +144,7 @@ class OLED_2inch23(framebuf.FrameBuffer):
         self.show()
 
     def show(self):
+        self.show_lock.acquire()
         for page in range(0,4):
             self.write_cmd(0xb0 + page)
             self.write_cmd(0x04)
@@ -143,8 +152,40 @@ class OLED_2inch23(framebuf.FrameBuffer):
             self.dc(1)
             for num in range(0,128):
                 self.write_data(self.buffer[page*128+num])
+        self.show_lock.release()        
+    def is_screensaver(self):
+        return self.screensaver_active
+    
+    def is_screensaver(self):
+        return self.screensaver_active
         
-          
+    def set_screensaver_mode(self):
+        self.screensaver_active = True
+        for i in range(0,len(self.screesaver_pixels)):
+            self.screesaver_pixels[i] = [randrange(0,128), randrange(0,32)]
+        self.fill(self.black)  
+        
+        for pix in self.screesaver_pixels:
+            self.rect(pix[0],pix[1],1,1,self.white)
+            
+        self.show()
+        
+    def update_screensaver(self):        
+        for i in range(0,len(self.screesaver_pixels)):
+            self.screesaver_pixels[i][1] += 1
+            if self.screesaver_pixels[i][1] > 31:                
+                self.screesaver_pixels[i] = [randrange(0,128), 0]
+        self.fill(self.black)        
+        
+        for pix in self.screesaver_pixels:
+            self.rect(pix[0],pix[1],1,1,self.white)
+            
+        self.show()
+        
+    def reset_screensaver_mode(self): 
+        self.screensaver_active = False
+        self.display()
+        
 def debug():
 
     OLED = OLED_2inch23()
