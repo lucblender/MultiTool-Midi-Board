@@ -8,6 +8,7 @@ from OLED_SPI import OLED_2inch23
 
 import _thread
 
+MAX_DELAY_BEFORE_SCREENSAVER_S = 300
 stop_thread = False
 interrupt_lock = _thread.allocate_lock()
 
@@ -17,6 +18,10 @@ btn_up=Pin(3, mode=Pin.IN, pull = Pin.PULL_UP)
 btn_down=Pin(6, mode=Pin.IN, pull = Pin.PULL_UP)
 btn_enter=Pin(7, mode=Pin.IN, pull = Pin.PULL_UP)
 btn_back=Pin(16, mode=Pin.IN, pull = Pin.PULL_UP)
+
+pot_value_0 = machine.ADC(26)
+pot_value_1 = machine.ADC(27)
+pot_value_2 = machine.ADC(28)
 
 debounce_time_btn_up=0
 debounce_time_btn_down=0
@@ -70,8 +75,6 @@ OLED = OLED_2inch23(multiToolMidiConfig)
 
 multiToolMidiConfig.setDisplay(OLED)
 
-
-MAX_DELAY_BEFORE_SCREENSAVER_S = 300
 last_key_update = time.time()
 
 
@@ -112,6 +115,9 @@ def screen_saver_thread():
             if index%16== 0:
                 OLED.update_screensaver()
                 index = 0
+        elif OLED.need_display == True:
+            print("refresh display")
+            OLED.display()
     
 print("launch thread")
 _thread.start_new_thread(screen_saver_thread, ())
@@ -119,39 +125,40 @@ _thread.start_new_thread(screen_saver_thread, ())
 if (btn_up.value() and  btn_down.value() and  btn_enter.value() and  btn_back.value()) == 0:
     print("launch main")
     led.value(1)
-    OLED.display()
+    OLED.set_need_display()
     index = 0
     while True:
         if time.time() - last_key_update > MAX_DELAY_BEFORE_SCREENSAVER_S and OLED.is_screensaver() == False:
             OLED.set_screensaver_mode()
             
         btn_status_read()
+        multiToolMidiConfig.poll_adc_values()
             
         if btn_up_pressed:
             last_key_update = time.time()
-            print("btn_up_pressed")
             btn_up_pressed = False
+            multiToolMidiConfig.up_pressed()
             if OLED.is_screensaver() == True:
                 OLED.reset_screensaver_mode()
                 
         if btn_down_pressed:
             last_key_update = time.time()
-            print("btn_down_pressed")
             btn_down_pressed = False
+            multiToolMidiConfig.down_pressed()
             if OLED.is_screensaver() == True:
                 OLED.reset_screensaver_mode()
                 
         if btn_enter_pressed:
             last_key_update = time.time()
-            print("btn_enter_pressed")
             btn_enter_pressed = False
+            multiToolMidiConfig.enter_pressed()
             if OLED.is_screensaver() == True:
                 OLED.reset_screensaver_mode()
                 
         if btn_back_pressed:
             last_key_update = time.time()
-            print("btn_back_pressed")
             btn_back_pressed = False
+            multiToolMidiConfig.back_pressed()
             if OLED.is_screensaver() == True:
                 OLED.reset_screensaver_mode()
                 
