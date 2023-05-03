@@ -33,6 +33,8 @@ class OLED_2inch23(framebuf.FrameBuffer):
         
         self.show_lock = _thread.allocate_lock()
         
+        self.need_display = False
+        
         self.width = 128
         self.height = 32
         
@@ -128,21 +130,105 @@ class OLED_2inch23(framebuf.FrameBuffer):
         self.write_cmd(0x08)#Set VCOM Deselect Level
         self.write_cmd(0xAF); #-Set Page Addressing Mode (0x00/0x01/0x02)
         
+    def set_need_display(self):
+        self.need_display= True
+        
     def display(self):        
         self.fill(0x0000)
         if  self.multiToolMidiConfig.display_menu == False:
             channel_letters = ["A", "B", "C", "D"]
             for i in range(0,4):
-                if i%2==0:
+                if i%2==1:
                     self.rect(0+i*32,0,32,16,self.white)
-                    self.font_writer_arial8.text(str(channel_letters[i]),2+i*32,2)
-                    self.font_writer_arial10.text("Ch:"+str(self.multiToolMidiConfig.midi_channels_for_modules[i]),8+i*32,5)
+                    self.rect(1+i*32,0,6,1,self.black)
+                    self.font_writer_arial8.text(str(channel_letters[i]),1+i*32,1)
+                    self.font_writer_arial8.text("ch:",8+i*32,7)
+                    self.font_writer_arial10.text(str(self.multiToolMidiConfig.midi_channels_for_modules[i]),20+i*32,5)
+                    if self.multiToolMidiConfig.gate_cv_mode_modules[i].inverted_gate == False:
+                        self.line(2+i*32,13,4+i*32,13, self.white)
+                        self.line(4+i*32,13,4+i*32,8, self.white)
+                        self.line(4+i*32,8,6+i*32,8, self.white)
+                    else:                        
+                        self.line(2+i*32,8,4+i*32,8, self.white)
+                        self.line(4+i*32,13,4+i*32,8, self.white)
+                        self.line(4+i*32,13,6+i*32,13, self.white)
                 else:
                     self.fill_rect(0+i*32,0,32,16,self.white)
-                    self.font_writer_arial8.text(str(channel_letters[i]),2+i*32,2,True)
-                    self.font_writer_arial10.text("Ch:"+str(self.multiToolMidiConfig.midi_channels_for_modules[i]),8+i*32,5,True)
-        self.show()
+                    self.font_writer_arial8.text(str(channel_letters[i]),1+i*32,1,True)
+                    self.font_writer_arial8.text("ch:",8+i*32,7, True)
+                    self.font_writer_arial10.text(str(self.multiToolMidiConfig.midi_channels_for_modules[i]),20+i*32,5,True)
+                    if self.multiToolMidiConfig.gate_cv_mode_modules[i].inverted_gate == False:
+                        self.line(2+i*32,13,4+i*32,13, self.black)
+                        self.line(4+i*32,13,4+i*32,8, self.black)
+                        self.line(4+i*32,8,6+i*32,8, self.black)
+                    else:                        
+                        self.line(2+i*32,8,4+i*32,8, self.black)
+                        self.line(4+i*32,13,4+i*32,8, self.black)
+                        self.line(4+i*32,13,6+i*32,13, self.black)
+                    
+            pot_design_x = 96
+            pot_design_y = 16
+            pot_design_width = 32
+            pot_design_height = 5
+            for i in range(0,3):
+                self.rect(pot_design_x,pot_design_y+(pot_design_height-1)*i,pot_design_width,pot_design_height,self.white)                
+                self.fill_rect(pot_design_x,pot_design_y+(pot_design_height-1)*i,int(pot_design_width*self.multiToolMidiConfig.mot_pot_percent_value[i]/100),pot_design_height,self.white)
+        else:
+            
+            path = "/"
+            for sub_path in self.multiToolMidiConfig.menu_path:
+                path = path + sub_path + "/"
+            self.fill_rect(0,0,128,8,self.white)
+            self.font_writer_arial8.text(path,1,1,True)
+            
+            current_keys = self.multiToolMidiConfig.get_current_menu_keys()
+                
+            if self.multiToolMidiConfig.current_menu_selected >= self.multiToolMidiConfig.current_menu_len-2:
+                range_low = self.multiToolMidiConfig.current_menu_len-2
+            else:
+                range_low = self.multiToolMidiConfig.current_menu_selected
+            
+            range_high = range_low + 2
+            if range_high > (self.multiToolMidiConfig.current_menu_len):
+               range_high = (self.multiToolMidiConfig.current_menu_len)
+            general_index = 0
+            for i in range(range_low,range_high):
+                if i == self.multiToolMidiConfig.current_menu_selected:
+                    self.fill_rect(0,9+10*general_index,128,10,self.white)
+                    self.font_writer_arial10.text(current_keys[i],1,9+10*general_index, True)
+                else:
+                    self.font_writer_arial10.text(current_keys[i],1,9+10*general_index)
+                    
+                print(current_keys[i])
+                general_index = general_index+1
+            
+            #delimitation line between menu and top path
+            self.line(0,8,128,8,self.black)
+            
+            #side scrollbar
+            self.fill_rect(124,9, 4, 23, self.black)
+            self.rect(125,9, 3, 23, self.white)
+            
+            max_scrollbar_size_float = 22 / self.multiToolMidiConfig.current_menu_len
+            max_scrollbar_size = int(max_scrollbar_size_float)
+            if max_scrollbar_size == 0:
+                max_scrollbar_size = 1
+                        
+            self.rect(126,9+int(max_scrollbar_size_float*self.multiToolMidiConfig.current_menu_selected ), 1, max_scrollbar_size, self.white)
+            
+            """
+            self.multiToolMidiConfig.menu_navigation_map = get_menu_navigation_map()
 
+            self.multiToolMidiConfig.display_menu = True # TODO start in menu
+            self.multiToolMidiConfig.current_menu_len = len(self.menu_navigation_map)
+            self.multiToolMidiConfig.current_menu_selected = 0
+            self.multiToolMidiConfig.menu_path = []
+            """
+                
+        self.show()
+        self.need_display = False
+        
+        
     def show(self):
         self.show_lock.acquire()
         for page in range(0,4):
