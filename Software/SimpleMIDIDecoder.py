@@ -125,6 +125,9 @@ class SimpleMIDIDecoder:
         self.cbThruFn = 0
         self.cbNoteOnFn = 0
         self.cbNoteOffFn = 0
+        self.cbClockFn = 0
+        self.cbMidiStartFn = 0
+        self.cbMidiStopFn = 0
         
     def cbThru (self, callback):
         self.cbThruFn = callback
@@ -154,7 +157,7 @@ class SimpleMIDIDecoder:
         else:
             # Default NoteOn behaviour
             print ("NoteOn ", ch, ":", note, ":", level)
-        
+
     def cbNoteOff (self, callback):
         self.cbNoteOffFn = callback
 
@@ -167,9 +170,45 @@ class SimpleMIDIDecoder:
         else:
             # Default NoteOff behaviour
             print ("NoteOff ", ch, ":", note, ":", level)
+            
+    def cbClock (self, callback):
+        self.cbClockFn = callback
 
+    def ClockFn(self):
+        if (self.cbClockFn):
+            self.cbClockFn()
+        else:
+            # Default ClockFn behaviour
+            print ("Midi clock")
+            
+    def cbMidiStart(self, callback):
+        self.cbClockFn = callback
+
+    def MidiStartFn (self):
+        if (self.cbMidiStartFn):
+            self.cbMidiStartFn()
+        else:
+            # Default MidiStartFn behaviour
+            print ("Midi Start")
+            
+    def cbMidiStop(self, callback):
+        self.cbMidiStopFn = callback
+
+    def MidiStopFn (self):
+        if (self.cbMidiStopFn):
+            self.cbMidiStopFn()
+        else:
+            # Default MidiStopFn behaviour
+            print ("Midi Stop")
+        
     def read(self, mb):
-        if ((mb >= 0x80) and (mb <= 0xEF)):
+        if ( mb ==  0xF8):
+            self.ClockFn()
+        elif ( mb ==  0xFA):
+            self.MidiStartFn()
+        elif (mb == 0xFC):
+            self.MidiStopFn() 
+        elif ((mb >= 0x80) and (mb <= 0xEF)):
             # MIDI Voice Category Message.
             # Action: Start handling Running Status
             

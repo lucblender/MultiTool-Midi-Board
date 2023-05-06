@@ -8,6 +8,7 @@ import font.font10 as font10
 import font.font6 as font6
 import writer
 from multiToolMidiConfig import *
+import multiToolMidiConfig 
 from random import randrange
 
 import _thread
@@ -138,41 +139,71 @@ class OLED_2inch23(framebuf.FrameBuffer):
         if  self.multiToolMidiConfig.display_menu == False:
             channel_letters = ["A", "B", "C", "D"]
             for i in range(0,4):
+                midi_channel = self.multiToolMidiConfig.gate_cv_mode_modules[i].midi_channel
+                if midi_channel == 0:
+                    midi_channel_str = "all"
+                else:
+                    midi_channel_str = str(midi_channel)
+                    
+                if self.multiToolMidiConfig.gate_cv_mode_modules[i].cv_max == 0:
+                    cv_max = "0..10 v"
+                else:
+                    cv_max = "0..5 v"
                 if i%2==1:
-                    self.rect(0+i*32,0,32,16,self.white)
                     self.rect(1+i*32,0,6,1,self.black)
                     self.font_writer_arial8.text(str(channel_letters[i]),1+i*32,1)
-                    self.font_writer_arial8.text("ch:",8+i*32,7)
-                    self.font_writer_arial10.text(str(self.multiToolMidiConfig.midi_channels_for_modules[i]),20+i*32,5)
-                    if self.multiToolMidiConfig.gate_cv_mode_modules[i].inverted_gate == False:
-                        self.line(2+i*32,13,4+i*32,13, self.white)
-                        self.line(4+i*32,13,4+i*32,8, self.white)
-                        self.line(4+i*32,8,6+i*32,8, self.white)
+                    self.font_writer_arial8.text("ch:",3+i*32,7)
+                    self.font_writer_arial10.text(midi_channel_str,15+i*32,5)
+                    if self.multiToolMidiConfig.gate_cv_mode_modules[i].gate_level == 0:
+                        self.line(2+i*32,19,4+i*32,19, self.white)
+                        self.line(4+i*32,19,4+i*32,14, self.white)
+                        self.line(4+i*32,14,6+i*32,14, self.white)
                     else:                        
-                        self.line(2+i*32,8,4+i*32,8, self.white)
-                        self.line(4+i*32,13,4+i*32,8, self.white)
-                        self.line(4+i*32,13,6+i*32,13, self.white)
+                        self.line(2+i*32,14,4+i*32,14, self.white)
+                        self.line(4+i*32,19,4+i*32,14, self.white)
+                        self.line(4+i*32,19,6+i*32,19, self.white)
+                    self.font_writer_arial8.text(cv_max,9+i*32, 14)
+                    self.rect(0+i*32,0,32,22,self.white)
                 else:
-                    self.fill_rect(0+i*32,0,32,16,self.white)
+                    self.fill_rect(0+i*32,0,32,22,self.white)
                     self.font_writer_arial8.text(str(channel_letters[i]),1+i*32,1,True)
-                    self.font_writer_arial8.text("ch:",8+i*32,7, True)
-                    self.font_writer_arial10.text(str(self.multiToolMidiConfig.midi_channels_for_modules[i]),20+i*32,5,True)
-                    if self.multiToolMidiConfig.gate_cv_mode_modules[i].inverted_gate == False:
-                        self.line(2+i*32,13,4+i*32,13, self.black)
-                        self.line(4+i*32,13,4+i*32,8, self.black)
-                        self.line(4+i*32,8,6+i*32,8, self.black)
+                    self.font_writer_arial8.text("ch:",3+i*32,7, True)
+                    self.font_writer_arial10.text(midi_channel_str,15+i*32,5,True)
+                    if self.multiToolMidiConfig.gate_cv_mode_modules[i].gate_level == 0:
+                        self.line(2+i*32,19,4+i*32,19, self.black)
+                        self.line(4+i*32,19,4+i*32,14, self.black)
+                        self.line(4+i*32,14,6+i*32,14, self.black)
                     else:                        
-                        self.line(2+i*32,8,4+i*32,8, self.black)
-                        self.line(4+i*32,13,4+i*32,8, self.black)
-                        self.line(4+i*32,13,6+i*32,13, self.black)
-                    
+                        self.line(2+i*32,14,4+i*32,14, self.black)
+                        self.line(4+i*32,19,4+i*32,14, self.black)
+                        self.line(4+i*32,19,6+i*32,19, self.black)
+                    self.font_writer_arial8.text(cv_max,9+i*32, 14, True)
             pot_design_x = 96
-            pot_design_y = 16
+            pot_design_y = 22
             pot_design_width = 32
-            pot_design_height = 5
+            pot_design_height = 4
             for i in range(0,3):
                 self.rect(pot_design_x,pot_design_y+(pot_design_height-1)*i,pot_design_width,pot_design_height,self.white)                
                 self.fill_rect(pot_design_x,pot_design_y+(pot_design_height-1)*i,int(pot_design_width*self.multiToolMidiConfig.mot_pot_percent_value[i]/100),pot_design_height,self.white)
+            self.font_writer_arial8.text("tdi v: "+multiToolMidiConfig.timeDivToStr(self.multiToolMidiConfig.sync_out_module.time_division),57, 23)
+            self.rect(47,21,50,11,self.white)
+            
+            if self.multiToolMidiConfig.sync_out_module.clock_polarity == 0:
+                self.line(49,28,49,23, self.white)
+                self.line(49,23,51,23, self.white)
+                self.line(51,23,51,28, self.white)
+                self.line(51,28,55,28, self.white)
+            elif self.multiToolMidiConfig.sync_out_module.clock_polarity == 1:
+                self.line(49,23,49,28, self.white)
+                self.line(49,28,51,28, self.white)
+                self.line(51,23,51,28, self.white)
+                self.line(51,23,55,23, self.white)
+            elif self.multiToolMidiConfig.sync_out_module.clock_polarity == 2:
+                self.line(49,28,49,23, self.white)
+                self.line(49,23,52,23, self.white)
+                self.line(52,23,52,28, self.white)
+                self.line(52,28,55,28, self.white)
+                self.line(55,28,55,23, self.white)
         else:
             
             path = "/"
@@ -181,9 +212,9 @@ class OLED_2inch23(framebuf.FrameBuffer):
             self.fill_rect(0,0,128,8,self.white)
             self.font_writer_arial8.text(path,1,1,True)
             
-            current_keys = self.multiToolMidiConfig.get_current_menu_keys()
+            current_keys, in_last_sub_menu = self.multiToolMidiConfig.get_current_menu_keys()
                 
-            if self.multiToolMidiConfig.current_menu_selected >= self.multiToolMidiConfig.current_menu_len-2:
+            if self.multiToolMidiConfig.current_menu_selected >= self.multiToolMidiConfig.current_menu_len-2 and self.multiToolMidiConfig.current_menu_len>1:
                 range_low = self.multiToolMidiConfig.current_menu_len-2
             else:
                 range_low = self.multiToolMidiConfig.current_menu_selected
@@ -192,12 +223,20 @@ class OLED_2inch23(framebuf.FrameBuffer):
             if range_high > (self.multiToolMidiConfig.current_menu_len):
                range_high = (self.multiToolMidiConfig.current_menu_len)
             general_index = 0
+            
             for i in range(range_low,range_high):
+                    
                 if i == self.multiToolMidiConfig.current_menu_selected:
                     self.fill_rect(0,9+10*general_index,128,10,self.white)
-                    self.font_writer_arial10.text(current_keys[i],1,9+10*general_index, True)
+                    to_add = ""
+                    if in_last_sub_menu and self.multiToolMidiConfig.current_menu_value == i:
+                        to_add = "> "
+                    self.font_writer_arial10.text(to_add+current_keys[i],1,9+10*general_index, True)  
                 else:
-                    self.font_writer_arial10.text(current_keys[i],1,9+10*general_index)
+                    to_add = ""
+                    if in_last_sub_menu and self.multiToolMidiConfig.current_menu_value == i:
+                        to_add = "> "
+                    self.font_writer_arial10.text(to_add+current_keys[i],1,9+10*general_index)
                     
                 print(current_keys[i])
                 general_index = general_index+1

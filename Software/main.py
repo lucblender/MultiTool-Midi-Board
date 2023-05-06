@@ -89,12 +89,21 @@ def doMidiNoteOff(ch, cmd, note, vel):
 def doMidiThru(ch,cmd,data1,data2,idx = -1):
     print(ch,cmd,data1,data2,idx)
     if cmd == 176 and data1 == 1:        
-        multiToolMidiConfig.mode_update(data2, ch)
+        multiToolMidiConfig.mode_update(data2, ch)       
+def doMidiStart():    
+        multiToolMidiConfig.midi_start()
+def doMidiStop():
+        multiToolMidiConfig.midi_stop()
+def doMidiClock():
+        multiToolMidiConfig.midi_clock()
 # initialise MIDI decoder and set up callbacks
 md = SimpleMIDIDecoder.SimpleMIDIDecoder()
 md.cbNoteOn (doMidiNoteOn)
 md.cbNoteOff (doMidiNoteOff)
 md.cbThru(doMidiThru)
+md.cbMidiStart(doMidiStart)
+md.cbMidiStop(doMidiStop)
+md.cbClock(doMidiClock)
     
 led.value(1)
 time.sleep_ms(200)
