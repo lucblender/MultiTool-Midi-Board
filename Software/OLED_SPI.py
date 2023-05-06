@@ -184,7 +184,14 @@ class OLED_2inch23(framebuf.FrameBuffer):
             pot_design_height = 4
             for i in range(0,3):
                 self.rect(pot_design_x,pot_design_y+(pot_design_height-1)*i,pot_design_width,pot_design_height,self.white)                
-                self.fill_rect(pot_design_x,pot_design_y+(pot_design_height-1)*i,int(pot_design_width*self.multiToolMidiConfig.mot_pot_percent_value[i]/100),pot_design_height,self.white)
+                if i == 2: #pot 2 goes from -5V to 5V
+                    if self.multiToolMidiConfig.mot_pot_percent_value[i]<50:
+                        local_width = int(pot_design_width*(50-self.multiToolMidiConfig.mot_pot_percent_value[i])/100)
+                        self.fill_rect(pot_design_x+int(pot_design_width/2)-local_width,pot_design_y+(pot_design_height-1)*i,local_width,pot_design_height,self.white)
+                    else:
+                        self.fill_rect(pot_design_x+int(pot_design_width/2),pot_design_y+(pot_design_height-1)*i,int(pot_design_width*(self.multiToolMidiConfig.mot_pot_percent_value[i]-50)/100),pot_design_height,self.white)
+                else:
+                    self.fill_rect(pot_design_x,pot_design_y+(pot_design_height-1)*i,int(pot_design_width*self.multiToolMidiConfig.mot_pot_percent_value[i]/100),pot_design_height,self.white)
             self.font_writer_arial8.text("tdi v: "+multiToolMidiConfig.timeDivToStr(self.multiToolMidiConfig.sync_out_module.time_division),57, 23)
             self.rect(47,21,50,11,self.white)
             

@@ -79,15 +79,12 @@ last_key_update = time.time()
 
 
 def doMidiNoteOn(ch, cmd, note, vel):
-    print(ch, cmd, note, vel)
     multiToolMidiConfig.note_on(note, ch)
     
 def doMidiNoteOff(ch, cmd, note, vel):
-    print(ch, cmd, note, vel)
     multiToolMidiConfig.note_off(note, ch)
     
 def doMidiThru(ch,cmd,data1,data2,idx = -1):
-    print(ch,cmd,data1,data2,idx)
     if cmd == 176 and data1 == 1:        
         multiToolMidiConfig.mode_update(data2, ch)       
 def doMidiStart():    
@@ -125,7 +122,6 @@ def screen_saver_thread():
                 OLED.update_screensaver()
                 index = 0
         elif OLED.need_display == True:
-            print("refresh display")
             OLED.display()
     
 print("launch thread")
