@@ -113,6 +113,16 @@ OLED.display_helixbyte()
 time.sleep(1)
 OLED.display_debug()
 
+def is_usb_connected():
+    SIE_STATUS=const(0x50110000+0x50)
+    CONNECTED=const(1<<16)
+    SUSPENDED=const(1<<4)
+        
+    if (machine.mem32[SIE_STATUS] & (CONNECTED | SUSPENDED))==CONNECTED:
+        return True
+    else:
+        return False
+
 def screen_saver_thread():
     global stop_thread
     index = 0
@@ -128,7 +138,11 @@ def screen_saver_thread():
 print("launch thread")
 _thread.start_new_thread(screen_saver_thread, ())
 
-if (btn_up.value() and  btn_down.value() and  btn_enter.value() and  btn_back.value()) == 0:
+if is_usb_connected() and (btn_up.value() and  btn_down.value() and  btn_enter.value() and  btn_back.value()) == 1:
+    OLED.display_programming_mode()
+    stop_thread = True
+    print("exit")
+else:
     print("launch main")
     led.value(1)
     OLED.set_need_display()
@@ -172,7 +186,3 @@ if (btn_up.value() and  btn_down.value() and  btn_enter.value() and  btn_back.va
             md.read(uart.read(1)[0])
 
           
-else:
-    OLED.display_programming_mode()
-    stop_thread = True
-    print("exit")
