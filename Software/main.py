@@ -79,7 +79,7 @@ last_key_update = time.time()
 
 
 def doMidiNoteOn(ch, cmd, note, vel):
-    multiToolMidiConfig.note_on(note, ch)
+    multiToolMidiConfig.note_on(note, ch, vel)
     
 def doMidiNoteOff(ch, cmd, note, vel):
     multiToolMidiConfig.note_off(note, ch)
@@ -111,6 +111,7 @@ OLED.fill(0x0000)
 OLED.show()
 OLED.display_helixbyte()
 time.sleep(1)
+OLED.display_debug()
 
 def screen_saver_thread():
     global stop_thread

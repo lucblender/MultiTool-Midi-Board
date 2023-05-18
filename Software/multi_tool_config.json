@@ -1,0 +1,1 @@
+{"gate_cv_mode_modules": [{"gate_level": 1, "midi_channel": 1, "mod_output": 0, "cv_max ": 0}, {"gate_level": 0, "midi_channel": 1, "mod_output": 0, "cv_max ": 0}, {"gate_level": 0, "midi_channel": 2, "mod_output": 0, "cv_max ": 0}, {"gate_level": 0, "midi_channel": 3, "mod_output": 0, "cv_max ": 0}], "sync_out": {"time_division": 1, "clock_polarity": 1}}

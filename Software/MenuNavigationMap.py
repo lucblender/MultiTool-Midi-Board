@@ -17,6 +17,10 @@ def get_menu_navigation_map():
                 "values": ["all", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"],
                 "attribute_name" : "midi_channel"
             },
+            "mod output": {
+                "values": ["modulation", "velocity"],
+                "attribute_name" : "mod_output"
+            }
         },
             "module b": {
             "data_pointer": None,
@@ -32,6 +36,10 @@ def get_menu_navigation_map():
                 "values": ["all", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"],
                 "attribute_name" : "midi_channel"
             },
+            "mod output": {
+                "values": ["modulation", "velocity"],
+                "attribute_name" : "mod_output"
+            }
         },
             "module c": {
             "data_pointer": None,
@@ -47,6 +55,10 @@ def get_menu_navigation_map():
                 "values": ["all", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"],
                 "attribute_name" : "midi_channel"
             },
+            "mod output": {
+                "values": ["modulation", "velocity"],
+                "attribute_name" : "mod_output"
+            }
         },
             "module d": {
             "data_pointer": None,
@@ -62,6 +74,10 @@ def get_menu_navigation_map():
                 "values": ["all", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"],
                 "attribute_name" : "midi_channel"
             },
+            "mod output": {
+                "values": ["modulation", "velocity"],
+                "attribute_name" : "mod_output"
+            }
 
         }
         }),

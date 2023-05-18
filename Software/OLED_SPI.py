@@ -88,7 +88,16 @@ class OLED_2inch23(framebuf.FrameBuffer):
 
         self.blit(lxb_fbuf, 48, 0)
         self.show()
-        
+    def display_debug(self):
+        if len(self.multiToolMidiConfig.missing_devices)>0:
+            self.fill(self.black)#smallest
+            self.font_writer_arial10.text("Missing i2c devices:",0,0)
+            missing_addr = ""
+            for missing_device in self.multiToolMidiConfig.missing_devices:                
+                missing_addr = missing_addr + hex(missing_device) + "  "    
+            self.font_writer_arial10.text(missing_addr,0,10)
+            self.show()
+            time.sleep(1)
     def display_programming_mode(self):     
         self.fill(self.black)#smallest
         self.font_writer_arial10.text("Programming mode",0,0)
@@ -163,6 +172,9 @@ class OLED_2inch23(framebuf.FrameBuffer):
                         self.line(4+i*32,19,4+i*32,14, self.white)
                         self.line(4+i*32,19,6+i*32,19, self.white)
                     self.font_writer_arial8.text(cv_max,9+i*32, 14)
+                    if self.multiToolMidiConfig.gate_cv_mode_modules[i].mod_output == 1:
+                        self.font_writer_arial10.text("v",25+i*32,0)
+                        
                     self.rect(0+i*32,0,32,22,self.white)
                 else:
                     self.fill_rect(0+i*32,0,32,22,self.white)
@@ -178,6 +190,8 @@ class OLED_2inch23(framebuf.FrameBuffer):
                         self.line(4+i*32,19,4+i*32,14, self.black)
                         self.line(4+i*32,19,6+i*32,19, self.black)
                     self.font_writer_arial8.text(cv_max,9+i*32, 14, True)
+                    if self.multiToolMidiConfig.gate_cv_mode_modules[i].mod_output == 1:
+                        self.font_writer_arial10.text("v",25+i*32,0,True)
             pot_design_x = 96
             pot_design_y = 22
             pot_design_width = 32
@@ -190,6 +204,8 @@ class OLED_2inch23(framebuf.FrameBuffer):
                         self.fill_rect(pot_design_x+int(pot_design_width/2)-local_width,pot_design_y+(pot_design_height-1)*i,local_width,pot_design_height,self.white)
                     else:
                         self.fill_rect(pot_design_x+int(pot_design_width/2),pot_design_y+(pot_design_height-1)*i,int(pot_design_width*(self.multiToolMidiConfig.mot_pot_percent_value[i]-50)/100),pot_design_height,self.white)
+                    self.rect(pot_design_x+int(pot_design_width/2)-2,pot_design_y+(pot_design_height-1)*i,4,pot_design_height,self.white)
+                    self.rect(pot_design_x+int(pot_design_width/2)-1,pot_design_y+(pot_design_height-1)*i+1,2,pot_design_height-2,self.black)
                 else:
                     self.fill_rect(pot_design_x,pot_design_y+(pot_design_height-1)*i,int(pot_design_width*self.multiToolMidiConfig.mot_pot_percent_value[i]/100),pot_design_height,self.white)
             self.font_writer_arial8.text("tdi v: "+multiToolMidiConfig.timeDivToStr(self.multiToolMidiConfig.sync_out_module.time_division),57, 23)

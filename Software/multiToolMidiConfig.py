@@ -4,10 +4,16 @@ from machine import Pin
 from OLED_SPI import OLED_2inch23
 
 from MenuNavigationMap import *
+import json
+
+JSON_CONFIG_FILE_NAME = "multi_tool_config.json"
 
 sda=machine.Pin(4)
 scl=machine.Pin(5)
 i2c=machine.I2C(0,sda=sda, scl=scl, freq=400000)
+
+expected_devices = [0x60, 0x61, 0x63, 0x64, 0x65, 0x66, 0x67]
+devices = i2c.scan() #get devices because it's possible we don't have all the DAC soldered
 
 
 def enum(**enums: int):
@@ -58,8 +64,6 @@ def timeDivToTimeSplit(local_time_div):
     elif local_time_div == TimeDiv.ONE_THIRTYSECOND_T:
         return 2
 
-devices = i2c.scan() #get devices because it's possible we don't have all the DAC soldered
-
 volts_per_note = 1/12  # 1/12th V for 1V/Oct
 
 #using  V/oct A0(33) = 0V A1 = 1V 
@@ -70,14 +74,14 @@ def midi_to_mv(midi_note):
     return int(notemv)
 
 class GateCvModeModule:
-    def __init__(self, gatePin, cvI2cAddr, modI2cAddr, gate_level, cv_max, midi_channel):
-        print(self, gatePin, cvI2cAddr, modI2cAddr)
+    def __init__(self, gatePin, cvI2cAddr, modI2cAddr, gate_level, cv_max, mod_output, midi_channel):
         self.gatePin = gatePin
         self.cvI2cAddr = cvI2cAddr
         self.modI2cAddr = modI2cAddr
         
         self.gate_level = gate_level
         self.cv_max = cv_max
+        self.mod_output = mod_output
         self.midi_channel = midi_channel
         
         self.gateOut = Pin(self.gatePin, mode=Pin.OUT)
@@ -96,6 +100,11 @@ class GateCvModeModule:
     # modeValue in %
     def write_mode(self, modeValue): 
         dacValue = (modeValue/127*4095)/2
+        self.__write_DAC(dacValue, self.modI2cAddr)
+        
+    # velocity 0..127
+    def write_vel(self, velocity):
+        dacValue = (velocity/127*4095)/2
         self.__write_DAC(dacValue, self.modI2cAddr)
 
     def write_gate(self, gate):
@@ -169,10 +178,10 @@ class SyncOut:
 class MultiToolMidiConfig:
     def __init__(self):
         self.gate_cv_mode_modules = []
-        self.gate_cv_mode_modules.append(GateCvModeModule(0,0x61,0x60, 0, 0,4))
-        self.gate_cv_mode_modules.append(GateCvModeModule(2,0x63,0x62, 1, 0,5))
-        self.gate_cv_mode_modules.append(GateCvModeModule(13,0x65,0x64, 0, 0,6))
-        self.gate_cv_mode_modules.append(GateCvModeModule(14,0x67,0x66, 0, 0,16))
+        self.gate_cv_mode_modules.append(GateCvModeModule(0,0x61,0x60, 0, 0, 0,0))
+        self.gate_cv_mode_modules.append(GateCvModeModule(2,0x63,0x62, 0, 0, 0,1))
+        self.gate_cv_mode_modules.append(GateCvModeModule(13,0x65,0x64, 0, 0, 0,2))
+        self.gate_cv_mode_modules.append(GateCvModeModule(14,0x67,0x66, 0, 0, 0,3))
         
         self.mot_pot_modules = []
         self.mot_pot_modules.append(motPot(28))
@@ -200,6 +209,67 @@ class MultiToolMidiConfig:
         
         self.menu_navigation_map["sync out"]["data_pointer"] = self.sync_out_module
         
+        global expected_devices, devices
+        self.expected_devices = expected_devices
+        self.devices = devices
+        self.missing_devices = list(set(self.expected_devices)-set(self.devices))
+        
+        self.load_data()
+        
+        
+    def load_data(self):
+        print("Start loading data")
+        config_file = None
+        try:
+            config_file = open(JSON_CONFIG_FILE_NAME, "r")
+            dict_data = json.load(config_file)
+            gate_cv_mode_module_list = dict_data["gate_cv_mode_modules"]
+            i = 0
+            for dict_gate_cv_mode_module in gate_cv_mode_module_list:
+                self.gate_cv_mode_modules[i].gate_level = dict_gate_cv_mode_module["gate_level"]
+                self.gate_cv_mode_modules[i].cv_max = dict_gate_cv_mode_module["cv_max "]
+                self.gate_cv_mode_modules[i].midi_channel = dict_gate_cv_mode_module["midi_channel"]
+                self.gate_cv_mode_modules[i].mod_output = dict_gate_cv_mode_module["mod_output"]
+                i = i+1
+                
+            sync_out_dict= dict_data["sync_out"]
+            self.sync_out_module.time_division = sync_out_dict["time_division"]
+            self.sync_out_module.time_division = sync_out_dict["clock_polarity"]
+            
+            print("Data Loaded!")
+        except OSError:
+            print("Couldn't load config because of OS ERROR")
+        except Exception as e:
+            print("Couldn't load config because unknown error")
+            print(e)
+
+        if config_file != None:
+            config_file.close()
+            
+            
+    def save_data(self):
+        dict_data = {}
+        gate_cv_mode_module_list = []
+        i = 0
+        for gate_cv_mode_module in self.gate_cv_mode_modules:            
+            dict_gate_cv_mode_module = {}
+            dict_gate_cv_mode_module["gate_level"] = gate_cv_mode_module.gate_level
+            dict_gate_cv_mode_module["cv_max "] = gate_cv_mode_module.cv_max
+            dict_gate_cv_mode_module["midi_channel"] = gate_cv_mode_module.midi_channel
+            dict_gate_cv_mode_module["mod_output"] = gate_cv_mode_module.mod_output
+            gate_cv_mode_module_list.append(dict_gate_cv_mode_module)
+            i = i+1
+        dict_data["gate_cv_mode_modules"] = gate_cv_mode_module_list
+        
+        sync_out_dict = {}
+        sync_out_dict["time_division"] = self.sync_out_module.time_division
+        sync_out_dict["clock_polarity"] = self.sync_out_module.time_division
+        
+        dict_data["sync_out"] = sync_out_dict
+        
+        with open(JSON_CONFIG_FILE_NAME, "w") as config_file:
+            json.dump(dict_data, config_file)
+        
     def poll_adc_values(self):
         old_pot_value = []
         for value in self.mot_pot_percent_value:
@@ -224,16 +294,17 @@ class MultiToolMidiConfig:
         to_return = []
         for gate_cv_mode_module in self.gate_cv_mode_modules:
             to_return.append(gate_cv_mode_module.midi_channel)
-        print(to_return)
         return to_return
 
-    def note_on(self, note, midi_channel):
+    def note_on(self, note, midi_channel, vel):
         midi_channels_for_modules = self.get_midi_channels_for_modules()
         if midi_channel in midi_channels_for_modules or 0 in midi_channels_for_modules:
             for gate_cv_mode_module in self.gate_cv_mode_modules:
                 if gate_cv_mode_module.midi_channel == 0 or gate_cv_mode_module.midi_channel == midi_channel:
                     gate_cv_mode_module.write_gate(1)
                     gate_cv_mode_module.write_cv(note)
+                    if gate_cv_mode_module.mod_output == 1:
+                        gate_cv_mode_module.write_vel(vel)
         
     def note_off(self, note, midi_channel):
         midi_channels_for_modules = self.get_midi_channels_for_modules()
@@ -255,7 +326,7 @@ class MultiToolMidiConfig:
         midi_channels_for_modules = self.get_midi_channels_for_modules()
         if midi_channel in midi_channels_for_modules or 0 in midi_channels_for_modules:
             for gate_cv_mode_module in self.gate_cv_mode_modules:
-                if gate_cv_mode_module.midi_channel == 0 or gate_cv_mode_module.midi_channel == midi_channel:
+                if (gate_cv_mode_module.midi_channel == 0 or gate_cv_mode_module.midi_channel == midi_channel) and gate_cv_mode_module.mod_output == 0:
                     gate_cv_mode_module.write_mode(mode)
 
     """
@@ -271,13 +342,11 @@ class MultiToolMidiConfig:
             if self.current_menu_selected > 0:
                 self.current_menu_selected = self.current_menu_selected - 1
                 self.OLED.set_need_display()
-            print("up_pressed")
     def down_pressed(self):
         if self.display_menu == True:
             if self.current_menu_selected < self.current_menu_len-1:
                 self.current_menu_selected = self.current_menu_selected + 1
                 self.OLED.set_need_display()
-            print("down_pressed")
     def back_pressed(self):
         if self.display_menu == True:
             if len(self.menu_path) > 0:
@@ -288,8 +357,6 @@ class MultiToolMidiConfig:
             else:
                 self.display_menu = False
             self.OLED.set_need_display()
-
-            print("back_pressed")
     def enter_pressed(self):
         if self.display_menu == True:
             current_keys, in_last_sub_menu  = self.get_current_menu_keys()
@@ -301,6 +368,7 @@ class MultiToolMidiConfig:
                 attribute_name = tmp_menu_selected["attribute_name"]
                 attribute_value = setattr(self.get_current_data_pointer(), attribute_name,self.current_menu_selected)
                 self.current_menu_value = self.current_menu_selected
+                self.save_data()
                 self.OLED.set_need_display()
             else:
                 self.menu_path.append(current_keys[self.current_menu_selected])
@@ -338,7 +406,6 @@ class MultiToolMidiConfig:
                 tmp_menu_selected = tmp_menu_selected[key_path]
                 
             current_keys = list(tmp_menu_selected.keys())
-        print(current_keys)
         if "values" in current_keys:
             tmp_menu_selected = self.menu_navigation_map
             for key_path in self.menu_path:
