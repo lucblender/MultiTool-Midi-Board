@@ -143,9 +143,9 @@ class OLED_2inch23(framebuf.FrameBuffer):
     def set_need_display(self):
         self.need_display= True
         
-    def display(self):        
+    def display(self):
         self.fill(0x0000)
-        if  self.multiToolMidiConfig.display_menu == False:
+        if  self.multiToolMidiConfig.display_screen == multiToolMidiConfig.DisplayScreen.CV_GATE_SCREEN:
             channel_letters = ["A", "B", "C", "D"]
             for i in range(0,4):
                 midi_channel = self.multiToolMidiConfig.gate_cv_mode_modules[i].midi_channel
@@ -227,7 +227,7 @@ class OLED_2inch23(framebuf.FrameBuffer):
                 self.line(52,23,52,28, self.white)
                 self.line(52,28,55,28, self.white)
                 self.line(55,28,55,23, self.white)
-        else:
+        elif self.multiToolMidiConfig.display_screen == multiToolMidiConfig.DisplayScreen.CONFIG_SCREEN:
             
             path = "/"
             for sub_path in self.multiToolMidiConfig.menu_path:
@@ -261,7 +261,6 @@ class OLED_2inch23(framebuf.FrameBuffer):
                         to_add = "> "
                     self.font_writer_arial10.text(to_add+current_keys[i],1,9+10*general_index)
                     
-                print(current_keys[i])
                 general_index = general_index+1
             
             #delimitation line between menu and top path
@@ -286,7 +285,77 @@ class OLED_2inch23(framebuf.FrameBuffer):
             self.multiToolMidiConfig.current_menu_selected = 0
             self.multiToolMidiConfig.menu_path = []
             """
+        elif self.multiToolMidiConfig.display_screen == multiToolMidiConfig.DisplayScreen.MOT_POT_SCREEN:
+
+        #self.motPotPresets[0..15].values[0..2]
+        #self.motPotPresets[0..15].percent_value[0..2]
+        #self.motPotPresets[self.current_selected_motPot_preset].percent_value[i]
+        #self.current_selected_motPot_preset = 0
+        #self.multiToolMidiConfig.load_self_preset_pressed = False
+            
+            self.font_writer_arial10.text("MotPot Preset "+str(self.multiToolMidiConfig.current_selected_motPot_preset),5,5)
+            self.rect(0,0,3,18,self.white)
+            self.rect(1,1+self.multiToolMidiConfig.current_selected_motPot_preset,1,1,self.white)
+            pot_design_x = 87
+            pot_design_y = 4
+            pot_design_width = 40
+            pot_design_height = 4
+            for i in range(0,3):
+                self.rect(pot_design_x,pot_design_y+(pot_design_height-1)*i,pot_design_width,pot_design_height,self.white)                
+                if i == 2: #pot 2 goes from -5V to 5V
+                    if self.multiToolMidiConfig.motPotPresets[self.multiToolMidiConfig.current_selected_motPot_preset].percent_value[i]<50:
+                        local_width = int(pot_design_width*(50-self.multiToolMidiConfig.motPotPresets[self.multiToolMidiConfig.current_selected_motPot_preset].percent_value[i])/100)
+                        self.fill_rect(pot_design_x+int(pot_design_width/2)-local_width,pot_design_y+(pot_design_height-1)*i,local_width,pot_design_height,self.white)
+                    else:
+                        self.fill_rect(pot_design_x+int(pot_design_width/2),pot_design_y+(pot_design_height-1)*i,int(pot_design_width*(self.multiToolMidiConfig.motPotPresets[self.multiToolMidiConfig.current_selected_motPot_preset].percent_value[i]-50)/100),pot_design_height,self.white)
+                    self.rect(pot_design_x+int(pot_design_width/2)-2,pot_design_y+(pot_design_height-1)*i,4,pot_design_height,self.white)
+                    self.rect(pot_design_x+int(pot_design_width/2)-1,pot_design_y+(pot_design_height-1)*i+1,2,pot_design_height-2,self.black)
+                else:
+                    self.fill_rect(pot_design_x,pot_design_y+(pot_design_height-1)*i,int(pot_design_width*self.multiToolMidiConfig.motPotPresets[self.multiToolMidiConfig.current_selected_motPot_preset].percent_value[i]/100),pot_design_height,self.white)
+
                 
+            
+            self.fill_rect(0,19,128,16,self.white)
+            pot_design_x = 87
+            pot_design_y = 21
+            pot_design_width = 40
+            pot_design_height = 4
+            for i in range(0,3):
+                self.rect(pot_design_x,pot_design_y+(pot_design_height-1)*i,pot_design_width,pot_design_height,self.black)                
+                if i == 2: #pot 2 goes from -5V to 5V
+                    if self.multiToolMidiConfig.mot_pot_percent_value[i]<50:
+                        local_width = int(pot_design_width*(50-self.multiToolMidiConfig.mot_pot_percent_value[i])/100)
+                        self.fill_rect(pot_design_x+int(pot_design_width/2)-local_width,pot_design_y+(pot_design_height-1)*i,local_width,pot_design_height,self.black)
+                    else:
+                        self.fill_rect(pot_design_x+int(pot_design_width/2),pot_design_y+(pot_design_height-1)*i,int(pot_design_width*(self.multiToolMidiConfig.mot_pot_percent_value[i]-50)/100),pot_design_height,self.black)
+                    self.rect(pot_design_x+int(pot_design_width/2)-2,pot_design_y+(pot_design_height-1)*i,4,pot_design_height,self.black)
+                    self.rect(pot_design_x+int(pot_design_width/2)-1,pot_design_y+(pot_design_height-1)*i+1,2,pot_design_height-2,self.white)
+                else:
+                    self.fill_rect(pot_design_x,pot_design_y+(pot_design_height-1)*i,int(pot_design_width*self.multiToolMidiConfig.mot_pot_percent_value[i]/100),pot_design_height,self.black)
+            
+            if self.multiToolMidiConfig.load_self_preset_pressed == True:
+                
+                triangle_x = 2
+                triangle_y = 23
+                
+                self.line(triangle_x,triangle_y,triangle_x+6,triangle_y,self.black)
+                self.line(triangle_x,triangle_y,triangle_x+3,triangle_y+5,self.black)
+                self.line(triangle_x+3,triangle_y+5,triangle_x+6,triangle_y,self.black)
+                
+                
+                self.font_writer_arial8.text("to load,", 9 , 23, True)
+                
+                triangle_x = 36
+                triangle_y = 23
+                
+                self.line(triangle_x,triangle_y+5,triangle_x+6,triangle_y+5,self.black)
+                self.line(triangle_x,triangle_y+5,triangle_x+3,triangle_y,self.black)
+                self.line(triangle_x+3,triangle_y,triangle_x+6,triangle_y+5,self.black)
+                
+                self.font_writer_arial8.text("to save", 44, 23, True)
+            else:
+                self.font_writer_arial8.text("enter to select", 2, 23, True)
+                             
         self.show()
         self.need_display = False
         

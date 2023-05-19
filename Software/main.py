@@ -147,12 +147,22 @@ else:
     led.value(1)
     OLED.set_need_display()
     index = 0
+    
+    multiToolMidiConfig.poll_adc_values()
+    multiToolMidiConfig.mot_pot_modules[0].launch_to_setpoint(32768)
+    multiToolMidiConfig.mot_pot_modules[1].launch_to_setpoint(32768)
+    multiToolMidiConfig.mot_pot_modules[2].launch_to_setpoint(32768)
     while True:
         if time.time() - last_key_update > MAX_DELAY_BEFORE_SCREENSAVER_S and OLED.is_screensaver() == False:
             OLED.set_screensaver_mode()
             
         btn_status_read()
         multiToolMidiConfig.poll_adc_values()
+        motors_status = multiToolMidiConfig.update_motors()
+        
+        if motors_status == True:            
+            multiToolMidiConfig.poll_adc_values()
+            OLED.set_need_display()
             
         if btn_up_pressed:
             last_key_update = time.time()

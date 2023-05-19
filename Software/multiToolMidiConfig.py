@@ -1,5 +1,6 @@
 import machine
-from machine import Pin
+from machine import Pin, PWM
+import time
 
 from OLED_SPI import OLED_2inch23
 
@@ -27,6 +28,10 @@ TimeDiv = enum(ONE_FOURTH=0,
             ONE_SIXTEENTH_T=5,
             ONE_THIRTYSECOND=6,
             ONE_THIRTYSECOND_T=7)
+
+DisplayScreen = enum(CV_GATE_SCREEN = 0,
+                     MOT_POT_SCREEN = 1,
+                     CONFIG_SCREEN = 2)
 
 def timeDivToStr(local_time_div):
     if local_time_div == TimeDiv.ONE_FOURTH:
@@ -133,13 +138,97 @@ class GateCvModeModule:
             buf[2] = int(dacValue % 16) << 4
             i2c.writeto(addr, buf)
         
+class motPotPreset:
+    def __init__(self, value0 = 0, value1 = 0, value2 = 32768):
+        self.values = [0,0,0]
+        self.percent_value = [0,0,0]
+        self.set_value(0, value0)
+        self.set_value(1, value1)
+        self.set_value(2, value2)
+        
+    def set_value(self, index, raw_value):
+        self.values[index]  = raw_value
+        self.percent_value[index] = (raw_value*100)>>16 
+        
 class motPot:
-    def __init__(self, adc_pin):
+    def __init__(self, adc_pin, pwm_pin_1, pwm_pin_2):
         self.adc_pin = adc_pin
         self.adc = machine.ADC(self.adc_pin)
         self.motor_enabled = False
         self.value = 0
+        self.min_value = 0
+        self.max_value = 65535
+        self.detla_value = self.max_value -self.min_value
+        pin_1 = Pin(pwm_pin_1, mode=Pin.OUT)
+        self.pin_1_with_pwm = PWM(pin_1) # Attach PWM object on a pin
+
+        pin_2 = Pin(pwm_pin_2, mode=Pin.OUT)
+        self.pin_2_with_pwm = PWM(pin_2) # Attach PWM object on a pin
+
+        self.pin_1_with_pwm.freq(1000)
+        self.pin_2_with_pwm.freq(1000)
         
+        self.stop_motor()
+        
+        self.lowest_speed = 28000
+        self.highest_speed = 45000
+        self.delta_speed = self.highest_speed-self.lowest_speed
+        
+        self.timeout_ms = 1000
+        self.running = False        
+        
+        self.setpoint = 0        
+        
+        self.launch_to_setpoint_start_time = 0
+        self.valid_position_range = 65
+        
+    def launch_to_setpoint(self, setpoint):
+        self.setpoint = setpoint
+        self.running = True
+        self.launch_to_setpoint_start_time = time.ticks_ms()
+        self.update_motor()
+        
+    def update_motor(self):
+        if self.running == True:
+            if (time.ticks_ms()-self.launch_to_setpoint_start_time) > self.timeout_ms:
+                self.stop_motor()
+                self.running = False
+                print("Stopped motor due to timeout")
+                return True
+                
+            else:
+                if (self.setpoint - self.value)>self.valid_position_range:
+                    self.compute_speed_P_controller()
+                    self.run_forward(int(self.regulated_speed))
+                elif (self.setpoint - self.value)< (0-self.valid_position_range):
+                    self.compute_speed_P_controller()
+                    self.run_backward(int(self.regulated_speed))
+                else:
+                    self.stop_motor()
+                    self.running = False
+                    return True
+        return False                
+
+    def compute_speed_P_controller(self):        
+        error = abs(self.setpoint - self.value)
+
+        self.regulated_speed = self.lowest_speed + self.delta_speed * (error/self.detla_value)
+
+        print("self.regulated_speed ",self.regulated_speed)
+        
+    def run_forward(self, speed):
+        self.pin_1_with_pwm.duty_u16(0)
+        self.pin_2_with_pwm.duty_u16(speed)
+        
+    def run_backward(self, speed):
+        self.pin_1_with_pwm.duty_u16(speed)
+        self.pin_2_with_pwm.duty_u16(0)
+        
+    def stop_motor(self):        
+        self.pin_1_with_pwm.duty_u16(0)
+        self.pin_2_with_pwm.duty_u16(0)
+        
+    
     def get_last_adc_value(self):
         return self.value
         
@@ -184,19 +273,25 @@ class MultiToolMidiConfig:
         self.gate_cv_mode_modules.append(GateCvModeModule(14,0x67,0x66, 0, 0, 0,3))
         
         self.mot_pot_modules = []
-        self.mot_pot_modules.append(motPot(28))
-        self.mot_pot_modules.append(motPot(27))
-        self.mot_pot_modules.append(motPot(26))
+        self.mot_pot_modules.append(motPot(28,22,21))
+        self.mot_pot_modules.append(motPot(27,20,19))
+        self.mot_pot_modules.append(motPot(26,18,17))
         self.mot_pot_percent_value = [0,0,0]
+        
+        self.motPotPresets = []
+        for i in range(0,16):
+            self.motPotPresets.append(motPotPreset())
+
+        self.current_selected_motPot_preset = 0
+        self.load_self_preset_pressed = False
         
         self.sync_out_module = SyncOut(15)
         
-        self.midi_channels_for_modules = [4,5,6,16]
         self.OLED = None
         
         self.menu_navigation_map = get_menu_navigation_map()
         
-        self.display_menu = False # TODO start in menu
+        self.display_screen = DisplayScreen.CV_GATE_SCREEN # TODO start in menu
         self.current_menu_len = len(self.menu_navigation_map)
         self.current_menu_selected = 0
         self.current_menu_value = 0
@@ -236,6 +331,15 @@ class MultiToolMidiConfig:
             self.sync_out_module.time_division = sync_out_dict["time_division"]
             self.sync_out_module.time_division = sync_out_dict["clock_polarity"]
             
+            mot_pot_presets = dict_data["mot_pot_presets"]
+
+            mot_index = 0
+            for mot_pot_preset in mot_pot_presets:
+                value_index = 0
+                for value in mot_pot_preset:
+                    self.motPotPresets[mot_index].set_value(value_index, value)
+                    value_index = value_index + 1
+                mot_index = mot_index + 1            
             print("Data Loaded!")
         except OSError:
             print("Couldn't load config because of OS ERROR")
@@ -261,11 +365,22 @@ class MultiToolMidiConfig:
             i = i+1
         dict_data["gate_cv_mode_modules"] = gate_cv_mode_module_list
         
+        
+        mot_pot_presets = []
+        
+        for motPotPreset in self.motPotPresets:
+            value_list = []
+            for value in motPotPreset.values:
+                value_list.append(value)
+            mot_pot_presets.append(value_list)
+        dict_data["mot_pot_presets"] = mot_pot_presets
+        
         sync_out_dict = {}
         sync_out_dict["time_division"] = self.sync_out_module.time_division
         sync_out_dict["clock_polarity"] = self.sync_out_module.time_division
         
         dict_data["sync_out"] = sync_out_dict
+        
         
         with open(JSON_CONFIG_FILE_NAME, "w") as config_file:
             json.dump(dict_data, config_file)
@@ -286,7 +401,26 @@ class MultiToolMidiConfig:
                 need_update = True
         if need_update:
             self.OLED.set_need_display()
+        
+    def update_motors(self):
+        to_return = False
+        for mot_Pot_module in self.mot_pot_modules:
+            mot_status = mot_Pot_module.update_motor()
+            if mot_status:
+                to_return = True
+        return to_return
+    
+    def load_preset(self):
+        for i in range(0,3):
+            self.mot_pot_modules[i].launch_to_setpoint(self.motPotPresets[self.current_selected_motPot_preset].values[i])
             
+    def save_preset(self):        
+        self.poll_adc_values()
+        for i in range(0,3):
+            self.motPotPresets[self.current_selected_motPot_preset].set_value(i, self.mot_pot_modules[i].get_last_adc_value())
+        self.save_data()
+
+    
     def setDisplay(self, OLED):
         self.OLED = OLED
         
@@ -332,33 +466,65 @@ class MultiToolMidiConfig:
     """
     self.menu_navigation_map = get_menu_navigation_map()
 
-    self.display_menu = True # TODO start in menu
+    self.display_screen = True # TODO start in menu
     self.current_menu_len = len(self.menu_navigation_map)
     self.current_menu_selected = 0
     self.menu_path = []
     """
+
     def up_pressed(self):
-        if self.display_menu == True:                
+        if self.display_screen == DisplayScreen.CONFIG_SCREEN:                
             if self.current_menu_selected > 0:
                 self.current_menu_selected = self.current_menu_selected - 1
                 self.OLED.set_need_display()
+        elif  self.display_screen == DisplayScreen.MOT_POT_SCREEN:
+            if self.load_self_preset_pressed == True:
+                self.save_preset()
+                self.load_self_preset_pressed = False
+                self.OLED.set_need_display()      
+            else:
+                self.current_selected_motPot_preset = self.current_selected_motPot_preset-1
+                if self.current_selected_motPot_preset < 0:
+                    self.current_selected_motPot_preset = 0
+
+                self.OLED.set_need_display()        
+        
+            
     def down_pressed(self):
-        if self.display_menu == True:
+        if self.display_screen == DisplayScreen.CONFIG_SCREEN:
             if self.current_menu_selected < self.current_menu_len-1:
                 self.current_menu_selected = self.current_menu_selected + 1
                 self.OLED.set_need_display()
+        elif  self.display_screen == DisplayScreen.MOT_POT_SCREEN:
+            if self.load_self_preset_pressed == True:
+                self.load_preset()
+                self.load_self_preset_pressed = False
+                self.OLED.set_need_display()      
+            else:
+                self.current_selected_motPot_preset = self.current_selected_motPot_preset+1
+                if self.current_selected_motPot_preset > 15:
+                    self.current_selected_motPot_preset = 15
+                    
+                self.OLED.set_need_display()
+                
     def back_pressed(self):
-        if self.display_menu == True:
+        if self.display_screen == DisplayScreen.CONFIG_SCREEN:
             if len(self.menu_path) > 0:
                 self.menu_path = self.menu_path[:-1]
                 self.current_menu_selected = 0
                 current_keys, _ = self.get_current_menu_keys()
                 self.current_menu_len = len(current_keys)
             else:
-                self.display_menu = False
+                self.display_screen = DisplayScreen.CV_GATE_SCREEN
+            self.OLED.set_need_display()
+        elif self.display_screen == DisplayScreen.CV_GATE_SCREEN:
+            self.display_screen = DisplayScreen.MOT_POT_SCREEN
+            self.OLED.set_need_display()
+        elif self.display_screen == DisplayScreen.MOT_POT_SCREEN:
+            self.display_screen = DisplayScreen.CV_GATE_SCREEN
             self.OLED.set_need_display()
     def enter_pressed(self):
-        if self.display_menu == True:
+        if self.display_screen == DisplayScreen.CONFIG_SCREEN:
             current_keys, in_last_sub_menu  = self.get_current_menu_keys()
             if in_last_sub_menu:
                 # need to change value
@@ -384,8 +550,11 @@ class MultiToolMidiConfig:
                     self.current_menu_selected = attribute_value
                     self.current_menu_value = attribute_value
                 self.OLED.set_need_display()
-        else:
-            self.display_menu = True   
+        elif  self.display_screen == DisplayScreen.MOT_POT_SCREEN:
+            self.load_self_preset_pressed = not  self.load_self_preset_pressed            
+            self.OLED.set_need_display()
+        elif self.display_screen == DisplayScreen.CV_GATE_SCREEN:
+            self.display_screen = DisplayScreen.CONFIG_SCREEN   
             self.OLED.set_need_display()
     def get_current_data_pointer(self):
         tmp_menu_selected = self.menu_navigation_map
@@ -416,3 +585,4 @@ class MultiToolMidiConfig:
             current_keys.remove("data_pointer")
         return current_keys, in_last_sub_menu
         
+
